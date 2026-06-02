@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Activity, Upload, Microscope, Eraser, FileDown, CheckCircle2, XCircle } from 'lucide-react';
+import { Activity, Database, Upload, Microscope, Eraser, FileDown, CheckCircle2, XCircle } from 'lucide-react';
 
 export default function App() {
   const [libraryData, setLibraryData] = useState<any>(null);
@@ -193,14 +193,25 @@ export default function App() {
       // Veredicto Final (Conforme / No Conforme)
       const isConforme = (distance <= threshold) && (correlation >= 0.97);
       
-      setMetrics({
+      const newMetrics = {
           correlation: correlation,
           distance: distance,
           confidence: confidence,
           isConforme: isConforme,
           threshold: threshold
-      });
-      setBatchResults(null);
+      };
+      setMetrics(newMetrics);
+      
+      const newId = `SIM-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+      setCurrentSampleId(newId);
+      
+      const newResult = {
+          id: newId,
+          spectrum: newSample,
+          metrics: newMetrics
+      };
+      
+      setBatchResults(prev => prev ? [...prev, newResult] : [newResult]);
     }
   };
 
@@ -286,62 +297,88 @@ export default function App() {
           return `M${points.join(" L")}`;
       };
 
-      refPath = <path d={getPathD(refSpec)} fill="none" stroke="#2563eb" strokeWidth="2.5" />;
+      refPath = <path d={getPathD(refSpec)} fill="none" stroke="#00A3FF" strokeWidth="2.5" />;
       if (sampleData) {
-          samplePath = <path d={getPathD(sampleData)} fill="none" stroke="#cbd5e1" strokeWidth="2" strokeDasharray="4" />;
+          samplePath = <path d={getPathD(sampleData)} fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4" />;
       }
   } else {
-      refPath = <path d="M0,250 Q50,230 100,100 T200,180 T300,50 T400,200 T500,240 T600,260" fill="none" stroke="#2563eb" strokeWidth="2.5" />;
-      samplePath = sampleData ? null : <path d="M0,253 Q50,235 100,105 T200,185 T300,55 T400,205 T500,245 T600,265" fill="none" stroke="#cbd5e1" strokeWidth="2" strokeDasharray="4" />;
+      refPath = <path d="M0,250 Q50,230 100,100 T200,180 T300,50 T400,200 T500,240 T600,260" fill="none" stroke="#00A3FF" strokeWidth="2.5" />;
+      samplePath = sampleData ? null : <path d="M0,253 Q50,235 100,105 T200,185 T300,55 T400,205 T500,245 T600,265" fill="none" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4" />;
   }
 
   return (
-    <div className="flex h-screen w-full flex-col bg-slate-50 font-sans text-slate-900 overflow-hidden">
+    <div className="flex h-screen w-full flex-col bg-[#0c2f55] font-sans text-slate-200 overflow-hidden">
       {/* Header */}
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-8">
+      <header className="flex h-16 shrink-0 items-center justify-between bg-transparent px-8">
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded bg-blue-700 font-bold text-white">S</div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-800">
-            Spectra<span className="text-blue-600">Match</span>
+          <div className="flex h-8 w-8 items-center justify-center rounded bg-gradient-to-br from-cyan-400 to-blue-600 font-bold text-white shadow-[0_0_15px_rgba(34,211,238,0.4)]">
+            <Activity className="h-5 w-5 text-white" />
+          </div>
+          <h1 className="text-xl font-bold tracking-tight text-white">
+            Spectra<span className="text-cyan-400">Model</span>
           </h1>
+        </div>
+        <div className="h-8 w-8 rounded-full bg-[#101C2B] border border-[#1D3249] flex items-center justify-center cursor-pointer">
+            <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden p-6 gap-6 pt-0">
         {/* Sidebar */}
-        <aside className="w-64 border-r border-slate-200 bg-slate-50 p-6 flex flex-col shrink-0 overflow-y-auto">
-          <nav className="space-y-1">
-            <a href="#" className="flex items-center gap-3 rounded-md bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">
-              <Activity className="h-5 w-5" />
-              Live Analysis
-            </a>
-          </nav>
+        <aside className="w-80 rounded-2xl border border-[#1D3249] bg-[#0B1A2E] p-6 flex flex-col shrink-0 overflow-y-auto no-scrollbar shadow-2xl">
+          <div className="mb-8">
+            <h2 className="flex items-center gap-2 text-xl font-bold text-white tracking-tight">
+              <Database className="h-6 w-6 text-cyan-400" />
+              Biblioteca
+            </h2>
+          </div>
 
-
-          <div className="mt-10 flex flex-col gap-3">
-            <h3 className="px-3 mb-1 text-xs font-bold uppercase tracking-wider text-slate-400">Actions</h3>
-            <input type="file" accept=".json" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              <Upload className="h-4 w-4" />
-              Load Library JSON
-            </button>
+          <div className="mt-2 flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Cargar Formato JSON</label>
+              <input type="file" accept=".json" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-[#055b76] bg-[#072439] px-4 py-3 text-sm font-semibold text-cyan-400 hover:bg-[#0a2e47] transition-colors"
+              >
+                <Upload className="h-4 w-4" />
+                Cargar Referencias
+              </button>
+            </div>
             
-            <input type="file" accept=".csv" className="hidden" ref={sampleFileInputRef} onChange={handleSampleUpload} />
-            <button 
-              onClick={() => sampleFileInputRef.current?.click()}
-              className="w-full flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              <Upload className="h-4 w-4" />
-              Load Samples CSV
-            </button>
+            <div className="flex flex-col gap-1.5 mt-2">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Archivos Lote CSV</label>
+              <input type="file" accept=".csv" className="hidden" ref={sampleFileInputRef} onChange={handleSampleUpload} />
+              <button 
+                onClick={() => sampleFileInputRef.current?.click()}
+                className="w-full flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-[#055b76] bg-[#072439] px-4 py-3 text-sm font-semibold text-cyan-400 hover:bg-[#0a2e47] transition-colors"
+              >
+                <FileDown className="h-4 w-4" />
+                Cargar Muestras (CSV)
+              </button>
+            </div>
+
+            <div className="mt-4 flex flex-col gap-2">
+              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Registrados ({uploadedSamples ? uploadedSamples.length : 0})</label>
+              <div className="rounded-lg border border-[#1D3249] bg-[#071321]/50 p-4 text-center min-h-[80px] flex flex-col items-center justify-center overflow-y-auto max-h-[160px] no-scrollbar">
+                {uploadedSamples && uploadedSamples.length > 0 ? (
+                  <div className="w-full space-y-2">
+                    {uploadedSamples.map((s, idx) => (
+                      <div key={idx} className="text-xs text-slate-300 font-mono text-left px-2 py-1 rounded bg-[#0a1b2d] border border-[#1a314d]">
+                        {s.id}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-xs italic text-slate-500">Sin datos</span>
+                )}
+              </div>
+            </div>
 
             <button 
               onClick={clearSample}
               disabled={!sampleData}
-              className={`w-full flex items-center gap-3 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${sampleData ? 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 cursor-pointer' : 'border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed'}`}
+              className={`w-full flex items-center justify-center gap-2 rounded-lg border px-4 py-3 text-sm font-semibold transition-colors mt-2 ${sampleData ? 'border-rose-900/50 bg-rose-950/30 text-rose-400 hover:bg-rose-900/40 cursor-pointer' : 'border-[#1D3249] bg-[#071321]/50 text-slate-600 cursor-not-allowed'}`}
             >
               <Eraser className="h-4 w-4" />
               Limpiar
@@ -350,61 +387,93 @@ export default function App() {
             <button 
               onClick={captureSample}
               disabled={!libraryData}
-              className={`w-full flex items-center gap-3 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors mt-2 ${libraryData ? 'bg-blue-600 hover:bg-blue-700 cursor-pointer' : 'bg-slate-400 cursor-not-allowed'}`}
+              className={`w-full flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-semibold transition-colors mt-4 ${libraryData ? 'bg-[#15344f] border border-[#1D3249] text-cyan-50 hover:bg-[#1a3f60] cursor-pointer shadow-lg' : 'bg-[#0b1622] text-slate-600 border border-[#1D3249] cursor-not-allowed'}`}
             >
               <Microscope className="h-4 w-4" />
               Analizar Muestra
             </button>
+
+            <div className="border-t border-[#1D3249] mt-6 pt-6">
+              <div className="rounded-xl border border-[#1D3249] bg-[#1a314d] p-4 flex flex-col gap-2 shadow-inner">
+                <div className="flex items-center gap-2 text-cyan-400">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  <span className="font-bold text-sm">Metodología</span>
+                </div>
+                <p className="text-xs text-slate-300">Análisis de Distancia Euclidiana Multivariante. El umbral se define por 3 desviaciones estándar del grupo de referencia.</p>
+              </div>
+            </div>
           </div>
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 flex flex-col p-8 overflow-y-auto bg-slate-50">
-          <div className="flex items-end justify-between mb-6">
-            <div>
-              <p className="text-sm font-medium text-blue-600">
-                {currentSampleId 
-                  ? `Sample Analysis #${currentSampleId}`
-                  : libraryData ? `Model: ${libraryData.modelType || 'Unknown'} | Components: ${libraryData.nComponents || 0}` : 'Awaiting Library...'}
-              </p>
-              <h2 className="text-2xl font-bold text-slate-800">
-                {libraryData ? `Target: ${libraryData.analyticalProperty || 'Unknown'}` : 'Select a Database to Begin'}
-              </h2>
+        <main className="flex-1 rounded-2xl border border-[#1D3249] bg-[#0B1A2E] flex flex-col p-8 overflow-y-auto no-scrollbar shadow-2xl relative">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <svg className="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+              </svg>
+              <h2 className="text-2xl font-bold text-white tracking-tight">Terminal de Inspección</h2>
             </div>
+            
+            {libraryData && (
+              <div className="flex items-center gap-4 bg-[#101c2c] px-5 py-2.5 rounded-lg border border-[#1D3249] shadow-lg">
+                <span className="text-sm font-medium text-cyan-400"><span className="text-slate-500 mr-2">Target:</span> {libraryData.analyticalProperty || 'Unknown'}</span>
+                <span className="text-sm font-medium text-slate-300 pl-4 border-l border-[#1D3249]">
+                  <span className="text-slate-500 mr-2">Model:</span>{libraryData.modelType || 'Unknown'}
+                </span>
+                {currentSampleId && (
+                  <span className="text-sm font-bold text-white pl-4 border-l border-[#1D3249]">
+                    Sample #{currentSampleId}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
-          <div className="grid shrink-0 grid-cols-1 lg:grid-cols-3 gap-6 min-h-0">
+          {!libraryData && !sampleData && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center mt-12 pointer-events-none">
+              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-[#142e47] border border-dashed border-[#1D3249] shadow-xl mb-6">
+                <Activity className="h-10 w-10 text-cyan-400" />
+              </div>
+              <h3 className="text-2xl font-bold text-white tracking-tight mb-3">Listo para Inspección</h3>
+              <p className="text-slate-400 max-w-sm text-sm leading-relaxed">
+                Selecciona un archivo CSV con la muestra que deseas verificar contra tu biblioteca de referencia.
+              </p>
+            </div>
+          )}
+
+          <div className={`grid shrink-0 grid-cols-1 lg:grid-cols-3 gap-6 min-h-0 ${!libraryData && !sampleData ? 'opacity-0 invisible' : 'opacity-100 visible'}`}>
             {/* Spectrum Visualization */}
-            <div className="col-span-1 lg:col-span-2 flex flex-col rounded-xl border border-slate-200 bg-white p-6 shadow-sm min-h-[400px]">
+            <div className="col-span-1 lg:col-span-2 flex flex-col rounded-xl border border-[#1D3249] bg-[#101c2c] p-6 shadow-xl min-h-[400px]">
               <div className="mb-4 flex items-center justify-between">
-                <h3 className="text-sm font-bold uppercase tracking-tight text-slate-400">Spectral Overlay</h3>
+                <h3 className="text-sm font-bold uppercase tracking-tight text-white">Spectral Overlay</h3>
                 <div className="flex gap-4">
                   <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-sm bg-blue-600"></div>
-                    <span className="text-xs font-medium">Reference</span>
+                    <div className="h-3 w-3 rounded bg-[#00A3FF]"></div>
+                    <span className="text-xs font-medium text-slate-300">Reference</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="h-3 w-3 rounded-sm border-2 border-slate-300"></div>
+                    <div className="h-3 w-3 rounded border border-slate-400"></div>
                     <span className="text-xs font-medium text-slate-400">Captured</span>
                   </div>
                 </div>
               </div>
               
               {/* Simulated Spectrum Graph */}
-              <div className="relative flex-1 border-b border-l border-slate-100 min-h-0 mt-4 mb-4 ml-6">
+              <div className="relative flex-1 border-b border-l border-[#1D3249] min-h-0 mt-4 mb-4 ml-6">
                 <svg viewBox="0 0 600 300" className="h-full w-full absolute inset-0" preserveAspectRatio="none">
                   {/* Grid lines */}
-                  <line x1="0" y1="75" x2="600" y2="75" stroke="#f1f5f9" strokeWidth="1" />
-                  <line x1="0" y1="150" x2="600" y2="150" stroke="#f1f5f9" strokeWidth="1" />
-                  <line x1="0" y1="225" x2="600" y2="225" stroke="#f1f5f9" strokeWidth="1" />
+                  <line x1="0" y1="75" x2="600" y2="75" stroke="#1D3249" strokeWidth="1" strokeDasharray="4" />
+                  <line x1="0" y1="150" x2="600" y2="150" stroke="#1D3249" strokeWidth="1" strokeDasharray="4" />
+                  <line x1="0" y1="225" x2="600" y2="225" stroke="#1D3249" strokeWidth="1" strokeDasharray="4" />
                   {/* Paths */}
                   {refPath}
                   {samplePath}
                 </svg>
-                <div className="absolute -bottom-6 left-0 text-[10px] text-slate-400">{wlStart}</div>
-                <div className="absolute -bottom-6 right-0 text-[10px] text-slate-400">{wlEnd}</div>
+                <div className="absolute -bottom-6 left-0 text-[10px] font-mono text-[#0bb4db]">{wlStart}</div>
+                <div className="absolute -bottom-6 right-0 text-[10px] font-mono text-[#0bb4db]">{wlEnd}</div>
                 <div className="absolute -left-10 top-0 bottom-0 flex items-center justify-center">
-                  <span className="text-[10px] text-slate-400 -rotate-90 whitespace-nowrap">Absorbance</span>
+                  <span className="text-[10px] font-mono text-[#0bb4db] -rotate-90 whitespace-nowrap">Absorbance</span>
                 </div>
               </div>
             </div>
@@ -412,56 +481,56 @@ export default function App() {
             {/* Analysis Results Sidebar */}
             <div className="flex flex-col gap-6">
               {/* Match Score */}
-              <div className={`rounded-xl border p-6 shadow-sm transition-colors ${
+              <div className={`rounded-xl border p-6 shadow-xl transition-colors ${
                   !metrics 
-                    ? 'border-slate-200 bg-white' 
+                    ? 'border-[#1D3249] bg-[#101c2c]' 
                     : metrics.isConforme 
-                        ? 'border-green-200 bg-green-50' 
-                        : 'border-red-200 bg-red-50'
+                        ? 'border-emerald-500/30 bg-emerald-950/20' 
+                        : 'border-rose-500/30 bg-rose-950/20'
               }`}>
                 <p className={`text-xs font-bold uppercase tracking-wider ${
                     !metrics 
-                      ? 'text-slate-500' 
-                      : metrics.isConforme ? 'text-green-700' : 'text-red-700'
+                      ? 'text-cyan-500' 
+                      : metrics.isConforme ? 'text-emerald-400' : 'text-rose-400'
                 }`}>Confiabilidad Global</p>
                 <div className="mt-2 flex items-baseline gap-2">
                   <span className={`text-5xl font-black ${
                     !metrics 
-                      ? 'text-slate-300' 
-                      : metrics.isConforme ? 'text-green-700' : 'text-red-700'
+                      ? 'text-slate-500' 
+                      : metrics.isConforme ? 'text-emerald-400' : 'text-rose-400'
                   }`}>
                     {metrics ? metrics.confidence.toFixed(1) : '--'}
                   </span>
                   <span className={`text-xl font-bold ${
                     !metrics 
-                      ? 'text-slate-300' 
-                      : metrics.isConforme ? 'text-green-600' : 'text-red-600'
+                      ? 'text-slate-600' 
+                      : metrics.isConforme ? 'text-emerald-500' : 'text-rose-500'
                   }`}>%</span>
                 </div>
                 <p className={`mt-2 text-sm font-bold ${
                     !metrics 
-                      ? 'text-slate-400' 
-                      : metrics.isConforme ? 'text-green-800' : 'text-red-800'
+                      ? 'text-slate-500' 
+                      : metrics.isConforme ? 'text-emerald-500' : 'text-rose-500'
                 }`}>
                   {!metrics ? 'Esperando muestra...' : metrics.isConforme ? 'CONFORME (OK)' : 'NO CONFORME (FAIL)'}
                 </p>
               </div>
 
               {/* Details List */}
-              <div className="flex-1 rounded-xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col">
-                <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-400">Detalles de Evaluación</h3>
+              <div className="flex-1 rounded-xl border border-[#1D3249] bg-[#101c2c] p-6 shadow-xl flex flex-col">
+                <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-cyan-500">Detalles de Evaluación</h3>
                 <dl className="space-y-4 flex-1">
                   {metrics ? (
                       <>
                         <div>
                           <dt className="text-[10px] uppercase text-slate-400">Corr. de Forma (Pearson)</dt>
-                          <dd className={`text-sm font-semibold ${metrics.correlation >= 0.97 ? "text-green-600" : "text-red-600"}`}>
+                          <dd className={`text-sm font-semibold mt-1 ${metrics.correlation >= 0.97 ? "text-emerald-400" : "text-rose-400"}`}>
                              {(Math.max(0, metrics.correlation) * 100).toFixed(2)}% {metrics.correlation >= 0.97 ? "✓" : "✗ (>97%)"}
                           </dd>
                         </div>
                         <div>
                           <dt className="text-[10px] uppercase text-slate-400">Distancia Euclidiana</dt>
-                          <dd className={`text-sm font-semibold ${metrics.distance <= metrics.threshold ? "text-green-600" : "text-red-600"}`}>
+                          <dd className={`text-sm font-semibold mt-1 ${metrics.distance <= metrics.threshold ? "text-emerald-400" : "text-rose-400"}`}>
                              {metrics.distance.toFixed(4)} {metrics.distance <= metrics.threshold ? "✓" : `✗ (Max ${metrics.threshold.toFixed(4)})`}
                           </dd>
                         </div>
@@ -469,7 +538,7 @@ export default function App() {
                   ) : (
                     <div>
                       <dt className="text-[10px] uppercase text-slate-400">Umbral Máximo Configurado</dt>
-                      <dd className="text-sm font-semibold text-slate-800">
+                      <dd className="text-sm font-semibold text-slate-300 mt-1">
                         {libraryData?.referenceData?.threshold ? libraryData.referenceData.threshold.toFixed(4) : '--'}
                       </dd>
                     </div>
@@ -480,20 +549,20 @@ export default function App() {
           </div>
 
           {batchResults && batchResults.length > 0 && (
-            <div className="mt-8 flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden shrink-0">
-              <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-6 py-4">
-                <h3 className="text-sm font-bold uppercase tracking-tight text-slate-800">Resultados del Lote ({batchResults.length} muestras)</h3>
+            <div className="mt-8 flex flex-col rounded-xl border border-[#1D3249] bg-[#101c2c] shadow-xl overflow-hidden shrink-0 relative z-10">
+              <div className="flex items-center justify-between border-b border-[#1D3249] bg-[#0b1421] px-6 py-4">
+                <h3 className="text-sm font-bold uppercase tracking-tight text-white">Resultados del Lote ({batchResults.length} muestras)</h3>
                 <button 
                   onClick={generatePDFReport}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 transition-colors"
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-cyan-800 bg-[#122e4c] px-3 py-1.5 text-xs font-semibold text-cyan-400 hover:bg-[#1a3f68] transition-colors"
                 >
                   <FileDown className="h-4 w-4" />
                   Descargar Reporte PDF
                 </button>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm text-slate-600">
-                  <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+              <div className="overflow-x-auto no-scrollbar">
+                <table className="w-full text-left text-sm text-slate-300">
+                  <thead className="border-b border-[#1D3249] bg-[#071321] text-xs uppercase text-slate-400">
                     <tr>
                       <th className="px-6 py-3 font-semibold">ID Muestra</th>
                       <th className="px-6 py-3 font-semibold">Corr. de Forma</th>
@@ -502,30 +571,30 @@ export default function App() {
                       <th className="px-6 py-3 font-semibold text-right">Veredicto</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white">
+                  <tbody className="divide-y divide-[#1D3249] bg-[#101c2c]">
                     {batchResults.map((result, idx) => (
-                      <tr key={idx} className={`hover:bg-slate-50 cursor-pointer ${currentSampleId === result.id ? 'bg-blue-50/50' : ''}`} onClick={() => {
+                      <tr key={idx} className={`hover:bg-[#1a314d] cursor-pointer transition-colors ${currentSampleId === result.id ? 'bg-[#152a42]' : ''}`} onClick={() => {
                         setSampleData(result.spectrum);
                         setMetrics(result.metrics);
                         setCurrentSampleId(result.id);
                       }}>
-                        <td className="px-6 py-4 font-medium text-slate-900">{result.id}</td>
-                        <td className={`px-6 py-4 font-semibold ${result.metrics.correlation >= 0.97 ? "text-green-600" : "text-red-600"}`}>
+                        <td className="px-6 py-4 font-medium text-white">{result.id}</td>
+                        <td className={`px-6 py-4 font-semibold ${result.metrics.correlation >= 0.97 ? "text-emerald-400" : "text-rose-400"}`}>
                           {(Math.max(0, result.metrics.correlation) * 100).toFixed(2)}%
                         </td>
-                        <td className={`px-6 py-4 font-semibold ${result.metrics.distance <= result.metrics.threshold ? "text-green-600" : "text-red-600"}`}>
+                        <td className={`px-6 py-4 font-semibold ${result.metrics.distance <= result.metrics.threshold ? "text-emerald-400" : "text-rose-400"}`}>
                           {result.metrics.distance.toFixed(4)}
                         </td>
-                        <td className="px-6 py-4 font-semibold">
+                        <td className="px-6 py-4 font-semibold text-slate-200">
                           {result.metrics.confidence.toFixed(1)}%
                         </td>
                         <td className="px-6 py-4 text-right">
                            {result.metrics.isConforme ? (
-                             <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700">
+                             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-950/40 border border-emerald-800/50 px-2.5 py-0.5 text-xs font-semibold text-emerald-400">
                                <CheckCircle2 className="h-3.5 w-3.5" /> OK
                              </span>
                            ) : (
-                             <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-semibold text-red-700">
+                             <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-950/40 border border-rose-800/50 px-2.5 py-0.5 text-xs font-semibold text-rose-400">
                                <XCircle className="h-3.5 w-3.5" /> FAIL
                              </span>
                            )}
