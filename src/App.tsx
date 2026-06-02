@@ -28,6 +28,9 @@ export default function App() {
       threshold: number;
     }
   }[] | null>(null);
+  const [useSNV, setUseSNV] = useState(false);
+  const [useDetrend, setUseDetrend] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sampleFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -110,16 +113,81 @@ export default function App() {
     return numerator / denominator;
   };
 
+  const applySNV = (data: number[]) => {
+    let sum = 0;
+    const n = data.length;
+    for (let i = 0; i < n; i++) sum += data[i];
+    const mean = sum / n;
+    let varSum = 0;
+    for (let i = 0; i < n; i++) varSum += Math.pow(data[i] - mean, 2);
+    const stdDev = Math.sqrt(varSum / (n - 1)) || 1;
+    return data.map(val => (val - mean) / stdDev);
+  };
+
+  const applyDetrend = (data: number[]) => {
+    const n = data.length;
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    for (let i = 0; i < n; i++) {
+       sumX += i;
+       sumY += data[i];
+       sumXY += i * data[i];
+       sumX2 += i * i;
+    }
+    const slope = (n * sumXY - sumX * sumY) / ((n * sumX2) - (sumX * sumX) || 1);
+    const intercept = (sumY - slope * sumX) / n;
+    return data.map((val, i) => val - (slope * i + intercept));
+  };
+
+  const getPeaks = (spectrum: number[], wls: number[] | null) => {
+    if (!spectrum || spectrum.length === 0) return [];
+    
+    // Suavizado (Media móvil) para evitar ruido
+    const smoothed = [];
+    for (let i = 0; i < spectrum.length; i++) {
+       if (i === 0 || i === spectrum.length - 1) smoothed.push(spectrum[i]);
+       else smoothed.push((spectrum[i-1] + spectrum[i] + spectrum[i+1]) / 3);
+    }
+    
+    const peaks = [];
+    for (let i = 2; i < smoothed.length - 2; i++) {
+        if (
+            smoothed[i] > smoothed[i-1] && 
+            smoothed[i] > smoothed[i+1] &&
+            smoothed[i] > smoothed[i-2] &&
+            smoothed[i] > smoothed[i+2]
+        ) {
+            let wlLabel = `${i}`;
+            if (wls && wls.length > i) {
+               wlLabel = `${wls[i]} nm`;
+            } else if (wls && wls.length > 0) {
+               wlLabel = `${Math.round(wls[0] + (i / spectrum.length) * (wls[wls.length-1] - wls[0]))} nm`;
+            }
+            
+            peaks.push({
+                label: wlLabel,
+                absorbance: spectrum[i]
+            });
+        }
+    }
+    return peaks.sort((a, b) => b.absorbance - a.absorbance).slice(0, 3);
+  };
+
   const captureSample = () => {
     if (!libraryData?.referenceData?.meanSpectrum) return;
     
-    const refSpectrum = libraryData.referenceData.meanSpectrum;
+    let refSpectrum = libraryData.referenceData.meanSpectrum;
+    if (useDetrend) refSpectrum = applyDetrend(refSpectrum);
+    if (useSNV) refSpectrum = applySNV(refSpectrum);
+
     const threshold = libraryData.referenceData?.threshold || 1.3323;
     let newSample: number[];
 
     if (uploadedSamples && uploadedSamples.length > 0) {
       const results = uploadedSamples.map(sample => {
-        const iterSample = sample.spectrum;
+        let iterSample = sample.spectrum;
+        if (useDetrend) iterSample = applyDetrend(iterSample);
+        if (useSNV) iterSample = applySNV(iterSample);
+
         const correlation = getPearsonCorrelation(refSpectrum, iterSample);
         let sumSq = 0;
         for (let i = 0; i < Math.min(refSpectrum.length, iterSample.length); i++) {
@@ -134,11 +202,13 @@ export default function App() {
         if (corrScore < 95) confidence /= 2;
         if (corrScore < 85) confidence = 0;
         
+        confidence = Math.max(0, Math.min(100, confidence));
+        
         const isConforme = (distance <= threshold) && (correlation >= 0.97);
 
         return {
           id: sample.id,
-          spectrum: iterSample,
+          spectrum: iterSample, // Save processed spectrum so we can plot it!
           metrics: { correlation, distance, confidence, isConforme, threshold }
         };
       });
@@ -150,7 +220,7 @@ export default function App() {
     } else {
       const isMatch = Math.random() > 0.5;
       
-      newSample = refSpectrum.map((val: number) => {
+      let rawSample = libraryData.referenceData.meanSpectrum.map((val: number) => {
           if (isMatch) {
               return val * (0.95 + Math.random() * 0.1) + (Math.random() * 0.02 - 0.01);
           } else {
@@ -159,9 +229,13 @@ export default function App() {
       });
 
       if (!isMatch && Math.random() > 0.5) {
-          newSample.reverse();
+          rawSample.reverse();
       }
       setCurrentSampleId(null);
+
+      newSample = rawSample;
+      if (useDetrend) newSample = applyDetrend(newSample);
+      if (useSNV) newSample = applySNV(newSample);
       
       setSampleData(newSample);
       
@@ -189,6 +263,8 @@ export default function App() {
       if (corrScore < 85) {
           confidence = 0;
       }
+
+      confidence = Math.max(0, Math.min(100, confidence));
       
       // Veredicto Final (Conforme / No Conforme)
       const isConforme = (distance <= threshold) && (correlation >= 0.97);
@@ -252,7 +328,7 @@ export default function App() {
 
     autoTable(doc, {
       startY: 60,
-      head: [['ID Muestra', 'Corr. Pearson', 'Distancia Eucl.', 'Confiabilidad', 'Veredicto']],
+      head: [['ID Muestra', 'Corr. Pearson', 'Distancia Eucl.', 'Confianza', 'Veredicto']],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [30, 58, 138] }, // text-blue-900 equivalent
@@ -276,7 +352,10 @@ export default function App() {
   let wlEnd = "2500 nm";
 
   if (libraryData?.referenceData?.meanSpectrum) {
-      const refSpec = libraryData.referenceData.meanSpectrum;
+      let refSpec = libraryData.referenceData.meanSpectrum;
+      if (useDetrend) refSpec = applyDetrend(refSpec);
+      if (useSNV) refSpec = applySNV(refSpec);
+
       const wls = libraryData.referenceData.wavelengths || [];
       if (wls.length > 0) {
           wlStart = `${wls[0]} nm`;
@@ -356,23 +435,6 @@ export default function App() {
                 <FileDown className="h-4 w-4" />
                 Cargar Muestras (CSV)
               </button>
-            </div>
-
-            <div className="mt-4 flex flex-col gap-2">
-              <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Registrados ({uploadedSamples ? uploadedSamples.length : 0})</label>
-              <div className="rounded-lg border border-[#1D3249] bg-[#071321]/50 p-4 text-center min-h-[80px] flex flex-col items-center justify-center overflow-y-auto max-h-[160px] no-scrollbar">
-                {uploadedSamples && uploadedSamples.length > 0 ? (
-                  <div className="w-full space-y-2">
-                    {uploadedSamples.map((s, idx) => (
-                      <div key={idx} className="text-xs text-slate-300 font-mono text-left px-2 py-1 rounded bg-[#0a1b2d] border border-[#1a314d]">
-                        {s.id}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-xs italic text-slate-500">Sin datos</span>
-                )}
-              </div>
             </div>
 
             <button 
@@ -531,9 +593,37 @@ export default function App() {
                         <div>
                           <dt className="text-[10px] uppercase text-slate-400">Distancia Euclidiana</dt>
                           <dd className={`text-sm font-semibold mt-1 ${metrics.distance <= metrics.threshold ? "text-emerald-400" : "text-rose-400"}`}>
-                             {metrics.distance.toFixed(4)} {metrics.distance <= metrics.threshold ? "✓" : `✗ (Max ${metrics.threshold.toFixed(4)})`}
+                             {metrics.distance.toFixed(4)} {metrics.distance <= metrics.threshold ? "✓" : `✗ (<${metrics.threshold.toFixed(4)})`}
                           </dd>
                         </div>
+                        <div>
+                          <dt className="text-[10px] uppercase text-slate-400 mt-4 border-t border-[#1D3249] pt-4">Picos Referencia (Top 3)</dt>
+                          <dd className="mt-2 text-xs font-mono text-slate-300 space-y-1">
+                            {libraryData && getPeaks(
+                                useDetrend ? applyDetrend(useSNV ? applySNV(libraryData.referenceData.meanSpectrum) : libraryData.referenceData.meanSpectrum) : 
+                                (useSNV ? applySNV(libraryData.referenceData.meanSpectrum) : libraryData.referenceData.meanSpectrum),
+                                libraryData.referenceData.wavelengths
+                            ).map((p, idx) => (
+                               <div key={idx} className="flex justify-between">
+                                  <span>{p.label}</span>
+                                  <span className="text-[#00A3FF]">{p.absorbance.toFixed(4)}</span>
+                               </div>
+                            ))}
+                          </dd>
+                        </div>
+                        {sampleData && (
+                            <div>
+                              <dt className="text-[10px] uppercase text-slate-400">Picos Muestra (Top 3)</dt>
+                              <dd className="mt-2 text-xs font-mono text-slate-300 space-y-1">
+                                {getPeaks(sampleData, libraryData?.referenceData?.wavelengths).map((p, idx) => (
+                                   <div key={idx} className="flex justify-between">
+                                      <span>{p.label}</span>
+                                      <span className="text-slate-400">{p.absorbance.toFixed(4)}</span>
+                                   </div>
+                                ))}
+                              </dd>
+                            </div>
+                        )}
                       </>
                   ) : (
                     <div>
@@ -565,7 +655,7 @@ export default function App() {
                   <thead className="border-b border-[#1D3249] bg-[#071321] text-xs uppercase text-slate-400">
                     <tr>
                       <th className="px-6 py-3 font-semibold">ID Muestra</th>
-                      <th className="px-6 py-3 font-semibold">Corr. de Forma</th>
+                      <th className="px-6 py-3 font-semibold">Pearson</th>
                       <th className="px-6 py-3 font-semibold">Distancia</th>
                       <th className="px-6 py-3 font-semibold">Confianza</th>
                       <th className="px-6 py-3 font-semibold text-right">Veredicto</th>
